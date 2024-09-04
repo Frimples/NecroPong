@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pong Game</title>
+    <style>
+       body {
+            /* display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0; 
+            background-image: url("./images/background.png"); */
+            background-color: #000;
+       } 
+       
+       canvas {
+            /* background-image: url("./images/ezgif-3-e76e93ef81.gif"); */
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            position: fixed;
+            /* background-image: url("./images/background.jpg");*/
+            /*background-color: #333;
+            display: block; */
+        }
+       /* #startBtn {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 10px 20px;
+            font-size: 18px;
+            cursor: pointer;
+        } */
+        
+        #startBtn {
+            font-family: fantasy;
+            font-size: 16px;
+            background-color: lightcoral;
+            color: black;
+            margin: 8px;
+            border-color: lightgray;
+            border-width: 4px;
+            border-radius: 8px;
+            padding: 8px;
+        }
+
+        #pauseButton {
+            font-family: fantasy;
+            font-size: 16px;
+            background-color: lightcoral;
+            color: black;
+            margin: 8px;
+            border-color: lightgray;
+            border-width: 4px;
+            border-radius: 8px;
+            padding: 8px;
+        }
+
+        button:hover {
+            background-color: lightgreen;
+        }
+
+        #controlPanel {
+            background-color: #404040; 
+            margin: 4px; 
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="controlPanel" >
+        <!-- Start button -->
+        <button id="startBtn">START</button>;
+        <button id="pauseButton">PAUSE</button>;
+    </div>
+   
+    <canvas id="pongCanvas" width="640" height="480"></canvas>
+       
+    <audio id="backgroundMusic" loop>
+        <source src="./sounds/background.mp3" type="audio/mp3">
+    </audio>
+    <audio id="gameStartSound">
+        <source src="./sounds/start.mp3" type="audio/mp3">
+    </audio>
+    <audio id="paddleHitSound">
+        <source src="./sounds/paddle_hit.mp3" type="audio/mp3">
+    </audio>
+    <audio id="wallHitSound">
+        <source src="./sounds/wall_hit.mp3" type="audio/mp3">
+    </audio>
+    <audio id="scoreSound">
+        <source src="./sounds/score.mp3" type="audio/mp3">
+    </audio>
+    <audio id="winSound">
+        <source src="./sounds/win.mp3" type="audio/mp3">
+    </audio>
+    <audio id="paused" loop> <source src="./sounds/paused.mp3" type="audio/mp3"> 
+    </audio>
+
+    <script>
+       // Added Code
+
+       let PaddleBitmapLeft = new Image();
+       PaddleBitmapLeft.src = "./images/bonepaddle_lef2.png";
+
+       let PaddleBitmapShadow = new Image();
+       PaddleBitmapShadow.src = "./images/bonePaddle_shadow.png";
+
+       //let PaddleBitmapRight = new Image();
+       //PaddleBitmapRight.src = "./images/bonepaddle_right.png";
+
+       let BallImage = new Image();
+       BallImage.src = "./images/PongBall4.png";
+      
+       const canvas = document.getElementById('pongCanvas');
+       const ctx = canvas.getContext('2d');
+
+       canvas.style.backgroundImage = "url('./images/game_start.jpg')"; //Initial game screen before start
+        
+        const pauseButton = document.getElementById('pauseButton');
+
+        const startBtn = document.getElementById('startBtn');
+        const backgroundMusic = document.getElementById('backgroundMusic');
+        const gameStartSound = document.getElementById('gameStartSound');
+        const paddleHitSound = document.getElementById('paddleHitSound');
+        const wallHitSound = document.getElementById('wallHitSound');
+        const scoreSound = document.getElementById('scoreSound');
+        const winSound = document.getElementById('winSound');
+        
+        let playerScore = 0;
+        let aiScore = 0;
+        let gameOver = false;
+        let isGameRunning = false;
+        let playbackRate = 1; // Initial playback rate for the background music
+
+        let timer = 0;
+
+        let counter = 0;
+     
+        const HumanPlayer = "Human: ";
+        const AIPlayer = "A.I: ";
+
+        const paddleWidth = 21;
+        const paddleHeight = 74;
+        const ballRadius = 7;
+        
+        const playerPaddle = {
+            x: 10,
+            y: (canvas.height - paddleHeight) / 2,
+            width: paddleWidth,
+            height: paddleHeight,
+            dy: 0
+        };
+
+        const aiPaddle = {
+            x: canvas.width - 10 - paddleWidth,
+            y: (canvas.height - paddleHeight) / 2,
+            width: paddleWidth,
+            height: paddleHeight,
+            dy: 2
+        };
+
+        const ball = {
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            dx: 3 * (Math.random() < 0.5 ? 1 : -1),
+            dy: 3 * (Math.random() < 0.5 ? 1 : -1)
+        };
+       
+        function drawPaddle(paddle) {
+            // ctx.fillStyle = "#fff";
+            // ctx.fillRect(paddle.x, paddle.y, paddle.width, paddle.height);
+            ctx.fillStyle = "#fff";
+            //ctx.fillRect(paddle.x, paddle.y, paddle.width, paddle.height);
+            ctx.globalAlpha = 0.5;
+            ctx.drawImage(PaddleBitmapShadow,paddle.x - 10, 1.1*paddle.y +10, paddle.width, paddle.height);
+            ctx.globalAlpha = 1.0;
+            ctx.drawImage(PaddleBitmapLeft,paddle.x, paddle.y, paddle.width, paddle.height);
+
+        }
+
+        function drawBall() {
+            ctx.beginPath();
+            ctx.globalAlpha = 0.5;
+            ctx.arc(ball.x - ballRadius - 8, 1.1*ball.y - ballRadius +12, ballRadius, 0, Math.PI * 2);
+            //ctx.arc(ball.x, ball.y, ballRadius, 0, Math.PI * 2);
+            
+            ctx.fillStyle = "#000";
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+            ctx.drawImage(BallImage, ball.x - ballRadius, ball.y - ballRadius);
+            //ctx.drawImage(BallImage, ball.x, ball.y, ballRadius, 24);
+            ctx.closePath();
+        }
+
+        function drawScore() {
+            ctx.font = "16px Arial";
+            ctx.fillStyle = "#df4";
+            ctx.fillText("Meat Puppet :" + playerScore, canvas.width / 12, 14);
+            ctx.fillText("Terminator :" + aiScore, 3 * canvas.width / 4, 14);
+            // drawText(HumanPlayer + playerScore, canvas.width / 4, 14, '#FFFFFF');
+            // drawText("A.I.   " + ai.score, 3 * canvas.width / 4, 14, '#FFFFFF');
+
+        }
+
+        function update() {
+            if (!isGameRunning) return;
+            
+            playerPaddle.y += playerPaddle.dy;
+            playerPaddle.y = Math.max(Math.min(playerPaddle.y, canvas.height - paddleHeight), 0);
+
+            if (ball.y > aiPaddle.y + aiPaddle.height / 2) {
+                aiPaddle.y += aiPaddle.dy;
+            } else {
+                aiPaddle.y -= aiPaddle.dy;
+            }
+            aiPaddle.y = Math.max(Math.min(aiPaddle.y, canvas.height - paddleHeight), 0);
+
+            ball.x += ball.dx;
+            ball.y += ball.dy;
+
+            if (ball.y - ballRadius < 0 || ball.y + ballRadius > canvas.height) {
+                ball.dy *= -1;
+                wallHitSound.play();
+            }
+
+            if (
+                ball.x - ballRadius < playerPaddle.x + playerPaddle.width &&
+                ball.x - ballRadius > playerPaddle.x &&
+                ball.y > playerPaddle.y &&
+                ball.y < playerPaddle.y + playerPaddle.height
+            ) {
+                ball.dx *= -1;
+                paddleHitSound.play();
+            }
+
+            if (
+                ball.x + ballRadius > aiPaddle.x &&
+                ball.x + ballRadius < aiPaddle.x + aiPaddle.width &&
+                ball.y > aiPaddle.y &&
+                ball.y < aiPaddle.y + aiPaddle.height
+            ) {
+                ball.dx *= -1;
+                paddleHitSound.play();
+            }
+
+            if (ball.x - ballRadius < 0) {
+                aiScore++;
+                scoreSound.play();
+                adjustPlaybackRate(); // Increase playback rate when player scores
+                resetBall();
+            } else if (ball.x + ballRadius > canvas.width) {
+                playerScore++;
+                scoreSound.play();
+                adjustPlaybackRate(); // Increase playback rate when AI scores
+                resetBall();
+            }
+
+            if (playerScore >= 10 || aiScore >= 10) {
+                gameOver = true;
+                isGameRunning = false;
+                winSound.play();
+                backgroundMusic.pause();
+                // startBtn.style.display = "block";
+            }
+        }
+
+        function resetBall() {
+            ball.x = canvas.width / 2;
+            ball.y = canvas.height / 2;
+            ball.dx *= -1;
+            ball.dy = 3 * (Math.random() < 0.5 ? 1 : -1);
+        }
+
+        function clearCanvas() {
+           ctx.clearRect(0, 0, canvas.width, canvas.height)
+        }
+
+        function gameLoop() {
+            if (!isGameRunning) return;
+            clearCanvas();
+            drawPaddle(playerPaddle);
+            drawPaddle(aiPaddle);
+            drawBall();
+            drawScore();
+            update();
+// Adjust the timing of background image switching based on the playback rate
+let interval = Math.max(500 / playbackRate, 100); // Minimum interval of 100ms
+
+var d = new Date(); // Get current time
+timer = d.getMilliseconds();
+
+if (timer % interval < interval / 2) {
+    canvas.style.backgroundImage = "url('./images/background_border3.jpg')";
+} else {
+    canvas.style.backgroundImage = "url('./images/background_border4.jpg')";
+}
+if (playerScore >= 10 || aiScore >=10)
+{
+    canvas.style.backgroundImage = "url('./images/game_over02.jpg')";
+}
+requestAnimationFrame(gameLoop); 
+
+} 
+
+
+        function adjustPlaybackRate() {
+            playbackRate += 0.1; // Increase playback rate by 10%
+            backgroundMusic.playbackRate = playbackRate; // Set the new playback rate
+        }
+
+        startBtn.addEventListener('click', () => {
+            if (!isGameRunning) {
+                isGameRunning = true;
+                gameStartSound.play();
+                backgroundMusic.play();
+                playerScore = 0;
+                aiScore = 0;
+                gameOver = false;
+                playbackRate = 1; // Reset playback rate to initial value
+                backgroundMusic.playbackRate = playbackRate; // Apply the initial playback rate
+                //startBtn.style.display = "none";
+                gameLoop();
+            }
+        });
+
+        pauseButton.addEventListener('click', () => {
+            if (isGameRunning) {
+                isGameRunning = false;
+                backgroundMusic.pause();
+                gameStartSound.pause();
+                paused.play();
+                event.srcElement.innerHTML = "PAUSED";
+                }
+            else
+            {
+                isGameRunning = true;
+                paused.pause();
+                backgroundMusic.play();
+                gameLoop();
+                event.srcElement.innerHTML = "PAUSE";
+
+            }    
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowUp') {
+                playerPaddle.dy = -5;
+            } else if (e.key === 'ArrowDown') {
+                playerPaddle.dy = 5;
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                playerPaddle.dy = 0;
+            }
+        });
+
+        // startBtn.style.display = "block";
+        // pauseButton.style.display = "block";
+    </script>
+</body>
+</html>
